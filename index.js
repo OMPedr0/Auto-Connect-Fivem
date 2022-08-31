@@ -1,90 +1,98 @@
-const { Client, MessageEmbed, MessageButton, MessageActionRow, Intents } = require("discord.js");
-
-const client = new Client({
-    intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MESSAGES
-    ],
-});
-
-const config = require('./config.json')
-const colors = require('colors')
+const Discord = require("discord.js");
 const axios = require('axios')
+const client = new Discord.Client({ intents: 32767 });
+const config = require('./config.json');
+const colors = require('colors')
 
+/**
+ * @param {Discord.Message} message
+ */
 
+client.on("ready", async(message) => {
+    console.log(colors.blue('[#] Bot iniciado com sucesso, update sendo realizado dentro de segundos.'))
 
-client.on(`ready`, () => {
-    console.log(colors.cyan("[Info] ") + "Carregamento do bot iniciado.\n")
-})
+    var data = { players: "" }
 
-var data = {}
+    async function message() {
 
-client.on("ready", async() => {
+        async function update_info() {
 
-    try {
-        async function players_online() {
-            let response = await axios.get(`http://${config.ip}:${config.porta}/players.json`)
-            let play = response.data.length
-            return play
+            await axios.get(`http://${config.ip}:${config.porta}/players.json`).then(response => {
+                console.log(colors.green('[+] Update realizado com sucesso.'))
+                data.players = response.data.length
+            }).catch(err => data.players = -1)
         }
 
-        async function autoconnect() {
+        await update_info()
 
-            var players = await players_online()
+        await client.channels.cache.get(config.Canal).bulkDelete(100).catch(() => console.error)
 
-            await client.channels.cache.get(config.Canal).bulkDelete(1).catch((error) => { return console.log(error) })
+        if (data.players === -1) {
+            var embed = new Discord.MessageEmbed()
 
-            if (data.players === -1) {
-                var embed = new MessageEmbed()
-                    .setColor("RED")
-                    .setThumbnail(config.Logo)
-                    .addFields({ name: 'Status', value: '```fix\nOffline```' }, { name: 'IP SERVER', value: "```bash\n" + config.ip2 + "```" }, )
+            .setColor('#2f3136')
+                .setTitle('Para conectar no servidor clique nos botões a baixo.')
+                .addField(`Players:`, `\`\`\`ini\n [ 0/250 ] \`\`\``, true)
+                .addField('**Status:**', '```Bash\n"🔴 Offline "```', true)
+                .addField('**IP Servidor:**', `\`\`\`${config.ip2}\`\`\``, false)
+                .addField('**TeamSpeak**:', `\`\`\`${config.ts3}\`\`\``, false)
+                .setThumbnail(config.Logo)
 
-            } else {
-                var embed = new MessageEmbed()
-                    .setColor('PURPLE')
-                    .setThumbnail(config.Logo)
-                    .addFields({ name: 'Status', value: '```fix\nOnline```', inline: true }, { name: 'Jogadores Online', value: "```ini\n[ " + players + "/250 ]```", inline: true }, { name: 'IP SERVER', value: "```bash\n" + config.ip2 + "```" }, )
+        } else {
+            var embed = new Discord.MessageEmbed()
 
-            }
+            .setTitle('Utilize os links para acessar o servidor.')
+                .setColor('#2f3136')
+                .addField(`Players:`, `\`\`\`ini\n [ ${data.players}/250 ] \`\`\``, true)
+                .addField('**Status:**', '```Bash\n"🟢 Online "```', true)
+                .addField('**IP Servidor:**', `\`\`\`${config.ip2}\`\`\``, false)
+                .addField('**TeamSpeak**:', `\`\`\`${config.ts3}\`\`\``, false)
+                .setThumbnail(config.Logo)
 
-            const autoconnect = new MessageActionRow()
-                .addComponents(
-                    new MessageButton()
-                    .setStyle("LINK")
-                    .setLabel(`FiveM`)
-                    .setEmoji('878251971021246465')
-                    .setURL(config.CFX.url),
-
-                );
-
-            await client.channels.cache.get(config.Canal).send({
-                embeds: [embed],
-                components: [autoconnect]
-            }).then(msg => {
-                setInterval(() => {
-                    if (data.players === -1) {
-                        embed.color = "RED"
-                        embed.fields[0] = { name: 'Status', value: '```fix\nOffline```' }
-                        msg.edit(embed)
-                    } else {
-                        embed.color = "PURPLE"
-                        embed.fields[1] = { name: 'Jogadores Online', value: "```ini\n[ " + players + "/250 ]```", inline: true }
-                        msg.edit(embed)
-                        client.user.setStatus('dnd');
-                        client.user.setActivity(`${config.name} com ${players} players.`, { type: 'PLAYING' })
-                    }
-                }, 60);
-            })
         }
 
+        const cfx = new Discord.MessageButton()
 
-        await autoconnect()
+        .setStyle("LINK")
+            .setLabel(`FiveM`)
+            .setEmoji('878251971021246465')
+            .setURL(config.CFX.url)
 
-    } catch (err) {
-        return console.log(err)
+        const ts = new Discord.MessageButton()
+
+        .setStyle("LINK")
+            .setLabel(`TeamSpeak3`)
+            .setEmoji('878251970895429693')
+            .setURL(config.TS3.url)
+
+        const row = new Discord.MessageActionRow().addComponents([cfx, ts])
+
+        await client.channels.cache.get(config.Canal).send({
+            components: [row],
+            embeds: [embed]
+        }).then(msg => {
+
+            setInterval(async() => {
+                if (data.players === -1) {
+                    embed.fields[0].value = `\`\`\`ini\n [ 0/250 ] \`\`\``
+                    embed.fields[1].value = `\`\`\`Bash\n "🔴 Offline " \`\`\``
+                    msg.edit({ embeds: [embed] })
+                } else {
+                    embed.fields[0].value = `\`\`\`ini\n [ ${data.players}/250 ] \`\`\``
+                    embed.fields[1].value = `\`\`\`Bash\n "🟢 Online " \`\`\``
+                    msg.edit({ embeds: [embed] })
+                }
+                async function update_info() {
+                    await axios.get(`http://${config.ip}:${config.porta}/players.json`).then(response => {
+                        console.log(colors.green('[+] Update realizado com sucesso.'))
+                        data.players = response.data.length
+                    }).catch(err => data.players = -1)
+                }
+                await update_info()
+            }, 15000);
+        })
     }
-
+    message()
 })
 
-client.login(config.token)
+client.login(config.token);
